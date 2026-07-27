@@ -1,0 +1,49 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  --background: #000000;
+  --foreground: #f8f8f8;
+  --neon: #00d8ff;
+  --muted: #9ca3af;
+  --surface: #111111;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.glass-panel {
+  background: rgba(15, 15, 15, 0.86);
+  border: 1px solid rgba(0, 216, 255, 0.16);
+  box-shadow: 0 0 60px rgba(0, 216, 255, 0.08);
+  backdrop-filter: blur(18px);
+}
+
+.text-electric {
+  color: var(--neon);
+}
+
+.border-electric {
+  border-color: rgba(0, 216, 255, 0.45);
+}
+
+.bg-electric-soft {
+  background-color: rgba(0, 216, 255, 0.08);
+}
+
+@keyframes neon-flicker {
+  0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% {
+    opacity: 1;
+  }
+  20%, 24%, 55% {
+    opacity: 0.4;
+  }
+}
+
+.flicker {
+  animation: neon-flicker 3s infinite alternate;
+}

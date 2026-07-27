@@ -1,0 +1,60 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  --background: #000000;
+  --foreground: #f8f8f8;
+  --muted: #9ca3af;
+  --neon: #00d8ff;
+  --metal: #b8b8b8;
+  --metal-dark: #1d1d1d;
+  --surface: #111111;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--foreground);
+  background: var(--background);
+  font-family: "Inter", system-ui, sans-serif;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+::selection {
+  background: rgba(0, 216, 255, 0.24);
+  color: #ffffff;
+}
+
+@layer utilities {
+  .text-electric {
+    color: var(--neon);
+  }
+  .border-electric {
+    border-color: rgba(0, 216, 255, 0.45);
+  }
+  .bg-electric-soft {
+    background-color: rgba(0, 216, 255, 0.08);
+  }
+  .glass-panel {
+    background: rgba(15, 15, 15, 0.86);
+    border: 1px solid rgba(0, 216, 255, 0.16);
+    box-shadow: 0 0 60px rgba(0, 216, 255, 0.08);
+    backdrop-filter: blur(18px);
+  }
+}
