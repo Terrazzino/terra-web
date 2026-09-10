@@ -1,101 +1,138 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# TERRA web
 
-## Getting Started
+Sitio público y CMS privado de TERRA. Usa Next.js 14 (App Router), React 18,
+Tailwind CSS y Supabase (Database, Auth y Storage).
 
-### Requisitos previos
+## Ejecución local
 
-- Node.js 18 o superior
-- npm, pnpm o yarn
-- Cuenta en Supabase
-
-### Variables de entorno
-
-Crea un archivo `.env.local` en la raíz del proyecto con las siguientes variables:
-
-```env
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-NEXT_PUBLIC_ADMIN_EMAIL=tu-email@dominio.com
-```
-
-### Instalación
+Requiere Node.js 18 o superior.
 
 ```bash
 npm install
-```
-
-### Desarrollo local
-
-```bash
 npm run dev
 ```
 
-Abre [http://localhost:3000](http://localhost:3000) en tu navegador.
+Abrir `http://localhost:3000`. La landing está en `/` y el panel en `/admin`.
 
-### Estructura de rutas
+## Variables de entorno (local y Vercel)
 
-- `/` → Landing page pública de TERRA
-- `/admin` → Panel de administración protegido por Supabase Auth
+Configurar las mismas variables en `.env.local` y en Vercel > Project Settings >
+Environment Variables:
 
-### Supabase
-
-1. En Supabase crea las tablas ejecutando el script SQL en `supabase-schema.sql`.
-2. Crea los buckets de Storage:
-   - `flyers`
-   - `discografia`
-   - `merch`
-3. Ajusta permisos de bucket para permitir lectura pública de archivos.
-
-### Scripts disponibles
-
-- `npm run dev` → inicia el servidor de desarrollo.
-- `npm run build` → genera la aplicación para producción.
-- `npm run start` → ejecuta la app en modo producción.
-- `npm run lint` → ejecuta ESLint.
-
-### Notas importantes
-
-- El panel de admin solo permite acceso al email definido en `NEXT_PUBLIC_ADMIN_EMAIL`.
-- En la landing, los botones de entradas redirigen a Instagram.
-- No hay carrito de compra en el merch; todo se gestiona por mensaje directo.
-
-## Learn More
-
-Para más información sobre Next.js, revisa la documentación oficial:
-
-- [Next.js Documentation](https://nextjs.org/docs)
-- [Next.js Deployment](https://nextjs.org/docs/deployment)
-
----
-
-## Dónde está el script SQL
-
-El script para ejecutar en Supabase está en el archivo `supabase-schema.sql` en la raíz del proyecto.
-
-También puedes crear los buckets con el CLI de Supabase si prefieres:
-
-```bash
-supabase storage bucket create flyers --public
-supabase storage bucket create discografia --public
-supabase storage bucket create merch --public
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://PROJECT_REF.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=ANON_KEY
 ```
 
-## Deploy on Vercel
+Son identificadores públicos previstos por Supabase; la seguridad depende de RLS,
+no de ocultar la anon key. No usar `service_role` en Vercel ni en código cliente.
+`NEXT_PUBLIC_ADMIN_EMAIL` ya no se utiliza y debe eliminarse de Vercel y del entorno
+local después de desplegar esta versión.
 
-La forma más sencilla de desplegar es usar Vercel.
+## Preparación de Supabase
 
-- [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme)
+### 1. Auth por correo y contraseña
 
+En Supabase Dashboard:
 
-To learn more about Next.js, take a look at the following resources:
+1. Authentication > Providers > Email: habilitar Email.
+2. Authentication > Users: reutilizar el usuario existente y asignarle una
+   contraseña, o crear uno nuevo. No habilitar un formulario de registro público.
+3. Authentication > URL Configuration: definir Site URL con el dominio de
+   producción y agregar `http://localhost:3000/**` y el dominio de Vercel a Redirect
+   URLs. El callback se conserva para compatibilidad con confirmaciones/Magic Link.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+La contraseña se guarda exclusivamente en Supabase Auth; nunca en el repositorio ni
+en variables de entorno.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
+### 2. Auditoría previa de políticas
 
-## Deploy on Vercel
+El repositorio no puede conocer las políticas actualmente activas en producción.
+Antes de migrar, ejecutar y guardar el resultado de esta consulta en SQL Editor:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```sql
+select schemaname, tablename, policyname, roles, cmd, qual, with_check
+from pg_policies
+where (schemaname = 'public' and tablename in
+  ('historia','redes','discografia','recitales','el_club','merch','admin_users'))
+   or (schemaname = 'storage' and tablename = 'objects')
+order by schemaname, tablename, policyname;
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+La migración reemplaza las políticas de esas tablas y todas las políticas de
+`storage.objects`. Si el mismo proyecto Supabase contiene buckets de otra aplicación,
+adaptar primero la sección Storage para conservar sus políticas.
+
+### 3. Aplicar SQL/RLS
+
+Ejecutar completo en SQL Editor:
+
+`supabase/migrations/20260910_admin_security.sql`
+
+La migración no borra ni modifica contenido u objetos. Crea `admin_users`, habilita
+RLS, mantiene lectura pública para el contenido de la landing y restringe INSERT,
+UPDATE y DELETE a administradores autenticados. También deja lectura pública de los
+buckets `discografia`, `flyers` y `merch`, con escritura/borrado sólo para admins.
+
+### 4. Autorizar la cuenta administradora
+
+Después de crear o actualizar el usuario en Authentication > Users, ejecutar
+reemplazando sólo el correo:
+
+```sql
+insert into public.admin_users (user_id)
+select id from auth.users where lower(email) = lower('tu-email@dominio.com')
+on conflict (user_id) do nothing;
+```
+
+Verificar que insertó una fila:
+
+```sql
+select au.user_id, u.email
+from public.admin_users au
+join auth.users u on u.id = au.user_id;
+```
+
+Una cuenta autenticada que no esté en `admin_users` verá acceso denegado y RLS
+bloqueará sus operaciones aunque intente llamar directamente a la API.
+
+## Storage
+
+Los buckets usados son `discografia`, `flyers` y `merch`. La migración los crea si
+faltan o los conserva como públicos para que sus imágenes funcionen en la landing.
+Sólo un usuario incluido en `admin_users` puede subir, actualizar o borrar objetos.
+No borrar manualmente rutas referenciadas por las columnas `cover_path`, `flyer_path`
+o `image_path`.
+
+## Uso del panel
+
+1. Abrir `/admin` desde PC, tablet o celular.
+2. Ingresar correo y contraseña de la cuenta autorizada.
+3. Elegir Historia, Redes, Discografía, Recitales, Merch o El Club.
+4. Crear, editar, reemplazar imágenes o eliminar contenido.
+5. Usar “Cerrar sesión” al terminar.
+
+Las sesiones se guardan en cookies y el middleware de Supabase las refresca. La
+autorización se comprueba en servidor y cada operación vuelve a ser validada por RLS.
+
+## Scripts
+
+```bash
+npm run dev
+npm run build
+npm run start
+npm run lint
+```
+
+## Deploy en Vercel
+
+1. Aplicar la migración y autorizar el usuario en Supabase.
+2. Configurar las dos variables públicas en Production, Preview y Development según
+   corresponda.
+3. Desplegar el commit.
+4. Probar `/`, `/admin`, persistencia tras recarga, cierre de sesión y una edición con
+   imagen desde un teléfono.
+5. Confirmar desde una sesión anónima que SELECT funciona y que INSERT/UPDATE/DELETE
+   devuelven un error de RLS.
+
+No se requiere ninguna variable secreta nueva ni cambios de versión de dependencias.

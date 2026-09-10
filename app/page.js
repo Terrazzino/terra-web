@@ -40,7 +40,7 @@ export default function Home() {
   const [elClub, setElClub] = useState(null);
   const [merch, setMerch] = useState([]);
 
-  const instagramUrl = redes.find((item) => (item.name || "").toLowerCase().includes("instagram"))?.url || "https://www.instagram.com/terra_okey/";
+  const instagramUrl = redes.find((item) => (item.nombre || item.name || "").toLowerCase().includes("instagram"))?.url || "https://www.instagram.com/terra_okey/";
 
   const albums = useMemo(
     () => discografia.filter((item) => ["álbum", "album"].includes((item.tipo || "").toLowerCase())),
@@ -201,13 +201,14 @@ export default function Home() {
                 { name: "Instagram", label: "Instagram", url: "https://www.instagram.com/terra_okey/" },
                 { name: "TikTok", label: "TikTok", url: "https://www.tiktok.com/@terra_okey" },
               ]).map((item) => {
-                const nameKey = (item.name || item.label || "").toLowerCase();
+                const socialName = item.nombre || item.name || item.label || "Red social";
+                const nameKey = socialName.toLowerCase();
                 const matchedLogo = Object.keys(socialLogos).find((key) => nameKey.includes(key));
                 const logoImg = matchedLogo ? socialLogos[matchedLogo] : "/logo.png";
 
                 return (
                   <a
-                    key={`${item.name}-${item.url}`}
+                    key={`${socialName}-${item.url}`}
                     href={item.url}
                     target="_blank"
                     rel="noreferrer"
@@ -217,7 +218,7 @@ export default function Home() {
                     <div className="relative h-14 w-14 flex-none overflow-hidden rounded-full border border-white/10 transition-transform duration-300 group-hover:scale-110 group-hover:border-neon">
                       <Image 
                         src={logoImg} 
-                        alt={item.label || item.name} 
+                        alt={socialName}
                         fill 
                         className="object-cover" 
                       />
@@ -225,7 +226,7 @@ export default function Home() {
 
                     <div className="flex flex-col">
                       <span className="text-sm font-bold uppercase tracking-[0.2em] text-white group-hover:text-neon">
-                        {item.label || item.name}
+                        {socialName}
                       </span>
                       <span className="text-xs text-white/60">Abrir enlace oficial</span>
                     </div>
@@ -263,6 +264,10 @@ export default function Home() {
 
             {/* RELATO COMPLETO DE LA HISTORIA */}
             <div className="space-y-6 text-base leading-8 text-white/80 sm:text-lg sm:leading-9">
+              {historia?.texto ? (
+                <p className="whitespace-pre-line">{historia.texto}</p>
+              ) : (
+                <>
               <p>
                 Terra nació en plena pandemia, después del final de otro proyecto de rock. En ese momento la búsqueda era distinta: bajar un cambio, explorar sonidos más cercanos al folk y empezar de nuevo. Pero con el tiempo quedó claro que había algo imposible de dejar atrás: el rock and roll.
               </p>
@@ -295,6 +300,8 @@ export default function Home() {
                   Y esto recién empieza.
                 </p>
               </div>
+                </>
+              )}
             </div>
 
           </div>
@@ -454,7 +461,7 @@ export default function Home() {
                       <p>Dirección: {item.direccion}</p>
                     </div>
                     <a
-                      href={instagramUrl}
+                      href={item.instagram_url || instagramUrl}
                       target="_blank"
                       rel="noreferrer"
                       className="inline-flex items-center justify-center rounded-full border border-neon/30 bg-neon/10 px-4 py-3 text-center text-xs uppercase tracking-[0.35em] text-neon transition hover:bg-neon/20"
