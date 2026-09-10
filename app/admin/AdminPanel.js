@@ -97,8 +97,10 @@ function Feedback({ feedback, onClose }) {
 
 function Login({ authorizationError }) {
   const router = useRouter();
+  const [mode, setMode] = useState("login");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(authorizationError ? "Falta aplicar la migración de seguridad de Supabase." : "");
+  const [message, setMessage] = useState("");
 
   const signIn = async (event) => {
     event.preventDefault();
@@ -118,20 +120,53 @@ function Login({ authorizationError }) {
     router.refresh();
   };
 
+  const requestPasswordReset = async (event) => {
+    event.preventDefault();
+    if (busy) return;
+    setBusy(true);
+    setError("");
+    setMessage("");
+    const form = new FormData(event.currentTarget);
+    const email = String(form.get("email") || "").trim();
+    const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent("/auth/update-password")}`;
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+    if (resetError) setError(resetError.message || "No se pudo enviar el correo. Intentá nuevamente.");
+    else setMessage("Si existe una cuenta asociada a ese correo, recibirás un enlace para restablecer la contraseña.");
+    setBusy(false);
+  };
+
+  const changeMode = (nextMode) => {
+    setMode(nextMode);
+    setError("");
+    setMessage("");
+  };
+
   return (
     <main className="flex min-h-screen items-center justify-center bg-black px-4 py-10 text-white">
       <div className="w-full max-w-md rounded-[2rem] border border-white/10 bg-[#0b0b0b] p-6 shadow-glow sm:p-9">
         <Image src="/logo.png" alt="TERRA" width={82} height={82} className="mx-auto rounded-full" priority />
         <p className="mt-6 text-center text-xs font-bold uppercase tracking-[0.35em] text-neon">Panel privado</p>
         <h1 className="mt-3 text-center text-3xl font-black uppercase tracking-[0.12em]">Administración</h1>
-        <p className="mt-3 text-center text-sm leading-6 text-white/55">Ingresá con una cuenta administradora autorizada en Supabase.</p>
-        <form onSubmit={signIn} className="mt-7 grid gap-4">
-          <label className="grid gap-2"><span className="text-xs font-bold uppercase tracking-[0.2em] text-white/55">Correo</span><input className={inputClass} name="email" type="email" autoComplete="email" required /></label>
-          <label className="grid gap-2"><span className="text-xs font-bold uppercase tracking-[0.2em] text-white/55">Contraseña</span><input className={inputClass} name="password" type="password" autoComplete="current-password" required /></label>
-          <button disabled={busy} className="mt-2 inline-flex min-h-13 items-center justify-center gap-2 rounded-2xl bg-neon px-5 py-4 text-sm font-black uppercase tracking-[0.18em] text-black disabled:opacity-50">
-            {busy ? <Loader2 className="animate-spin" size={19} /> : <LogIn size={19} />} {busy ? "Ingresando..." : "Ingresar"}
-          </button>
-        </form>
+        <p className="mt-3 text-center text-sm leading-6 text-white/55">{mode === "login" ? "Ingresá con una cuenta administradora autorizada en Supabase." : "Te enviaremos un enlace seguro para crear una nueva contraseña."}</p>
+        {mode === "login" ? (
+          <form onSubmit={signIn} className="mt-7 grid gap-4">
+            <label className="grid gap-2"><span className="text-xs font-bold uppercase tracking-[0.2em] text-white/55">Correo</span><input className={inputClass} name="email" type="email" autoComplete="email" required /></label>
+            <label className="grid gap-2"><span className="text-xs font-bold uppercase tracking-[0.2em] text-white/55">Contraseña</span><input className={inputClass} name="password" type="password" autoComplete="current-password" required /></label>
+            <button disabled={busy} className="mt-2 inline-flex min-h-13 items-center justify-center gap-2 rounded-2xl bg-neon px-5 py-4 text-sm font-black uppercase tracking-[0.18em] text-black disabled:opacity-50">
+              {busy ? <Loader2 className="animate-spin" size={19} /> : <LogIn size={19} />} {busy ? "Ingresando..." : "Ingresar"}
+            </button>
+            <button type="button" disabled={busy} onClick={() => changeMode("reset")} className="min-h-11 text-sm font-semibold text-neon underline-offset-4 hover:underline disabled:opacity-50">¿Olvidaste tu contraseña?</button>
+          </form>
+        ) : (
+          <form onSubmit={requestPasswordReset} className="mt-7 grid gap-4">
+            <label className="grid gap-2"><span className="text-xs font-bold uppercase tracking-[0.2em] text-white/55">Correo</span><input className={inputClass} name="email" type="email" autoComplete="email" required /></label>
+            <button disabled={busy} className="mt-2 inline-flex min-h-13 items-center justify-center gap-2 rounded-2xl bg-neon px-5 py-4 text-sm font-black uppercase tracking-[0.14em] text-black disabled:opacity-50">
+              {busy ? <Loader2 className="animate-spin" size={19} /> : <LogIn size={19} />} {busy ? "Enviando..." : "Enviar enlace"}
+            </button>
+            <button type="button" disabled={busy} onClick={() => changeMode("login")} className="min-h-11 text-sm font-semibold text-white/65 underline-offset-4 hover:text-white hover:underline disabled:opacity-50">Volver al login</button>
+          </form>
+        )}
+        {message ? <p role="status" className="mt-4 rounded-2xl border border-emerald-400/25 bg-emerald-500/10 p-3 text-sm leading-6 text-emerald-100">{message}</p> : null}
         {error ? <p role="alert" className="mt-4 rounded-2xl border border-red-400/25 bg-red-500/10 p-3 text-sm text-red-200">{error}</p> : null}
       </div>
     </main>

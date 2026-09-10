@@ -45,6 +45,33 @@ En Supabase Dashboard:
 La contraseña se guarda exclusivamente en Supabase Auth; nunca en el repositorio ni
 en variables de entorno.
 
+#### Recuperación de contraseña
+
+El login de `/admin` permite solicitar un correo mediante Supabase Auth. La URL se
+genera dinámicamente desde `window.location.origin`, por lo que funciona sin una
+variable adicional en localhost, previews y producción. El enlace vuelve a
+`/auth/callback`, que intercambia el código PKCE por una sesión en cookies y redirige
+a `/auth/update-password`.
+
+En Authentication > URL Configuration configurar:
+
+- **Site URL:** el dominio canónico de producción, por ejemplo
+  `https://mi-dominio.com`.
+- **Redirect URLs:**
+  - `http://localhost:3000/**`
+  - `https://mi-dominio.com/**`
+  - `https://*-<team-or-account-slug>.vercel.app/**` para Preview Deployments,
+    reemplazando el slug por el equipo o cuenta real de Vercel.
+
+La ruta `/auth/update-password` sólo habilita el formulario cuando el callback creó
+una sesión válida de Supabase y una marca HTTP-only de recuperación de corta duración.
+Después del cambio se cierra la sesión local y se vuelve al login. Recuperar una
+contraseña no agrega usuarios a `admin_users` ni concede permisos administrativos.
+
+Supabase devuelve una respuesta indistinguible aunque el correo no exista, evitando
+enumeración de cuentas. Para producción se recomienda configurar SMTP propio; el
+servicio de prueba de Supabase tiene límites de envío reducidos.
+
 ### 2. Auditoría previa de políticas
 
 El repositorio no puede conocer las políticas actualmente activas en producción.
