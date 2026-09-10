@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { BookOpen, CheckCircle2, Disc3, ExternalLink, Home, Loader2, LogIn, LogOut, Menu, Music2, Package, Save, Share2, ShieldAlert, Ticket, X, XCircle } from "lucide-react";
+import { BookOpen, CheckCircle2, Disc3, ExternalLink, Home, Loader2, LogIn, LogOut, Menu, Music2, Newspaper, Package, Save, Share2, ShieldAlert, Ticket, X, XCircle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import CollectionManager from "./CollectionManager";
 
@@ -16,6 +16,7 @@ const sections = [
   { id: "redes", label: "Redes", icon: Share2 },
   { id: "discografia", label: "Discografía", icon: Disc3 },
   { id: "recitales", label: "Recitales", icon: Ticket },
+  { id: "novedades", label: "Novedades", icon: Newspaper },
   { id: "merch", label: "Merch", icon: Package },
   { id: "club", label: "El Club", icon: Music2 },
 ];
@@ -44,6 +45,25 @@ const collectionConfig = {
       { name: "instagram_url", label: "Instagram URL", type: "url", placeholder: "https://...", wide: true },
     ],
     image: { bucket: "flyers", pathField: "flyer_path", urlField: "flyer_url", label: "Elegir flyer" },
+  },
+  novedades: {
+    title: "Novedades",
+    description: "Administrá noticias, anuncios y lanzamientos destacados de la landing.",
+    fields: [
+      { name: "titulo", label: "Título", required: true, wide: true },
+      { name: "descripcion", label: "Descripción", kind: "textarea", wide: true },
+      { name: "fecha", label: "Fecha editorial", type: "date", emptyAsNull: true },
+      { name: "orden", label: "Orden", type: "number", inputMode: "numeric" },
+      { name: "url", label: "URL", type: "url", placeholder: "https://...", wide: true },
+      { name: "texto_boton", label: "Texto del botón", placeholder: "ESCUCHAR, VER VIDEO...", wide: true },
+      { name: "visible", label: "Visible en la landing", kind: "checkbox", defaultValue: true },
+      { name: "destacada", label: "Noticia destacada", kind: "checkbox", defaultValue: false },
+    ],
+    statusFields: [
+      { name: "visible", trueLabel: "Visible", falseLabel: "Oculta" },
+      { name: "destacada", trueLabel: "Destacada", falseLabel: "Normal" },
+    ],
+    image: { bucket: "novedades", pathField: "imagen_path", urlField: "imagen_url", label: "Elegir imagen" },
   },
   merch: {
     title: "Merch",
@@ -201,7 +221,7 @@ export default function AdminPanel({ initialUser, authorized, authorizationError
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(Boolean(initialUser && authorized));
   const [feedback, setFeedback] = useState(null);
-  const [content, setContent] = useState({ redes: [], historia: null, discografia: [], recitales: [], elClub: null, merch: [] });
+  const [content, setContent] = useState({ redes: [], historia: null, discografia: [], recitales: [], novedades: [], elClub: null, merch: [] });
   const [historiaText, setHistoriaText] = useState("");
   const [clubForm, setClubForm] = useState({ descripcion: "", playlist_url: "" });
   const [redesDraft, setRedesDraft] = useState({});
@@ -214,17 +234,19 @@ export default function AdminPanel({ initialUser, authorized, authorizationError
         supabase.from("historia").select("*").order("id", { ascending: true }).limit(1).maybeSingle(),
         supabase.from("discografia").select("*").order("created_at", { ascending: false }),
         supabase.from("recitales").select("*").order("created_at", { ascending: false }),
+        supabase.from("novedades").select("*").order("destacada", { ascending: false }).order("orden", { ascending: true }).order("fecha", { ascending: false, nullsFirst: false }),
         supabase.from("el_club").select("*").order("id", { ascending: true }).limit(1).maybeSingle(),
         supabase.from("merch").select("*").order("created_at", { ascending: false }),
       ]);
       const failed = results.find((result) => result.error);
       if (failed) throw failed.error;
-      const [redes, historia, discografia, recitales, club, merch] = results.map((result) => result.data);
+      const [redes, historia, discografia, recitales, novedades, club, merch] = results.map((result) => result.data);
       const next = {
         redes: redes || [],
         historia: historia || null,
         discografia: (discografia || []).map((item) => ({ ...item, cover_url: item.cover_url || getPublicUrl("discografia", item.cover_path) })),
         recitales: (recitales || []).map((item) => ({ ...item, flyer_url: item.flyer_url || getPublicUrl("flyers", item.flyer_path) })),
+        novedades: (novedades || []).map((item) => ({ ...item, imagen_url: item.imagen_url || getPublicUrl("novedades", item.imagen_path) })),
         elClub: club || null,
         merch: (merch || []).map((item) => ({ ...item, image_url: item.image_url || getPublicUrl("merch", item.image_path) })),
       };
@@ -383,7 +405,7 @@ export default function AdminPanel({ initialUser, authorized, authorizationError
 
           {!loading && active === "redes" ? <section><h2 className="text-2xl font-black uppercase tracking-[0.12em]">Redes sociales</h2><p className="mt-2 text-sm text-white/55">Editá el nombre, enlace y orden de las redes existentes.</p><div className="mt-6 grid gap-4">{content.redes.map((item) => <div key={item.id} className="grid gap-3 rounded-3xl border border-white/10 bg-[#0b0b0b] p-4 sm:grid-cols-[1fr_2fr_7rem]"><input aria-label="Nombre" className={inputClass} value={redesDraft[item.id]?.nombre || ""} onChange={(event) => setRedesDraft((draft) => ({ ...draft, [item.id]: { ...draft[item.id], nombre: event.target.value } }))} /><input aria-label="URL" type="url" className={inputClass} value={redesDraft[item.id]?.url || ""} onChange={(event) => setRedesDraft((draft) => ({ ...draft, [item.id]: { ...draft[item.id], url: event.target.value } }))} /><input aria-label="Orden" type="number" className={inputClass} value={redesDraft[item.id]?.orden ?? 0} onChange={(event) => setRedesDraft((draft) => ({ ...draft, [item.id]: { ...draft[item.id], orden: Number(event.target.value) } }))} /></div>)}</div><button disabled={busy || !content.redes.length} onClick={saveRedes} className="mt-4 inline-flex min-h-12 items-center gap-2 rounded-2xl bg-neon px-5 font-bold text-black disabled:opacity-50">{busy ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />} Guardar redes</button></section> : null}
 
-          {!loading && ["discografia", "recitales", "merch"].includes(active) ? <CollectionManager {...collectionConfig[active]} items={content[active]} busy={busy} onSave={(item, values, file) => saveCollection(active, item, values, file)} onDelete={(item) => deleteCollection(active, item)} /> : null}
+          {!loading && ["discografia", "recitales", "novedades", "merch"].includes(active) ? <CollectionManager {...collectionConfig[active]} items={content[active]} busy={busy} onSave={(item, values, file) => saveCollection(active, item, values, file)} onDelete={(item) => deleteCollection(active, item)} /> : null}
 
           {!loading && active === "club" ? <section><h2 className="text-2xl font-black uppercase tracking-[0.12em]">El Club</h2><p className="mt-2 text-sm text-white/55">Editá la descripción y el enlace a la playlist oficial.</p><div className="mt-6 grid gap-4"><label className="grid gap-2"><span className="text-xs font-bold uppercase tracking-[0.2em] text-white/55">Descripción</span><textarea rows={9} className={inputClass} value={clubForm.descripcion} onChange={(event) => setClubForm((form) => ({ ...form, descripcion: event.target.value }))} /></label><label className="grid gap-2"><span className="text-xs font-bold uppercase tracking-[0.2em] text-white/55">Playlist URL</span><input type="url" className={inputClass} value={clubForm.playlist_url} onChange={(event) => setClubForm((form) => ({ ...form, playlist_url: event.target.value }))} /></label></div><button disabled={busy} onClick={() => saveSingleton("el_club", content.elClub, { descripcion: clubForm.descripcion.trim(), playlist_url: clubForm.playlist_url.trim() }, "El Club")} className="mt-4 inline-flex min-h-12 items-center gap-2 rounded-2xl bg-neon px-5 font-bold text-black disabled:opacity-50">{busy ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />} Guardar El Club</button></section> : null}
         </div>

@@ -7,6 +7,14 @@ import { ImagePlus, Loader2, Pencil, Plus, Save, Trash2, X } from "lucide-react"
 const inputClass =
   "min-h-12 w-full rounded-2xl border border-white/10 bg-black px-4 py-3 text-base text-white outline-none transition placeholder:text-white/30 focus:border-neon sm:text-sm";
 
+function readFieldValue(field, formData) {
+  if (field.kind === "checkbox") return formData.has(field.name);
+  const value = String(formData.get(field.name) || "").trim();
+  if (field.type === "number") return Number(value) || 0;
+  if (field.emptyAsNull && !value) return null;
+  return value;
+}
+
 function RecordForm({ fields, image, initialValues, submitLabel, busy, onCancel, onSubmit }) {
   const id = useId();
   const [file, setFile] = useState(null);
@@ -24,12 +32,9 @@ function RecordForm({ fields, image, initialValues, submitLabel, busy, onCancel,
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    const values = Object.fromEntries(new FormData(event.currentTarget));
-    delete values.asset;
-    await onSubmit(
-      Object.fromEntries(Object.entries(values).map(([key, value]) => [key, String(value).trim()])),
-      file,
-    );
+    const formData = new FormData(event.currentTarget);
+    const values = Object.fromEntries(fields.map((field) => [field.name, readFieldValue(field, formData)]));
+    await onSubmit(values, file);
   };
 
   return (
@@ -37,16 +42,40 @@ function RecordForm({ fields, image, initialValues, submitLabel, busy, onCancel,
       <div className="grid gap-4 sm:grid-cols-2">
         {fields.map((field) => (
           <label key={field.name} className={field.wide ? "grid gap-2 sm:col-span-2" : "grid gap-2"}>
-            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-white/55">{field.label}</span>
-            <input
-              className={inputClass}
-              name={field.name}
-              type={field.type || "text"}
-              defaultValue={initialValues?.[field.name] || ""}
-              placeholder={field.placeholder || ""}
-              required={field.required}
-              inputMode={field.inputMode}
-            />
+            {field.kind === "checkbox" ? (
+              <span className="flex min-h-12 cursor-pointer items-center gap-3 rounded-2xl border border-white/10 bg-black px-4 py-3 text-sm font-semibold text-white/75">
+                <input
+                  className="h-4 w-4 accent-[#00d8ff]"
+                  name={field.name}
+                  type="checkbox"
+                  defaultChecked={initialValues?.[field.name] ?? field.defaultValue ?? false}
+                />
+                {field.label}
+              </span>
+            ) : (
+              <>
+                <span className="text-xs font-semibold uppercase tracking-[0.2em] text-white/55">{field.label}</span>
+                {field.kind === "textarea" ? (
+                  <textarea
+                    className={`${inputClass} min-h-32 resize-y`}
+                    name={field.name}
+                    defaultValue={initialValues?.[field.name] ?? ""}
+                    placeholder={field.placeholder || ""}
+                    required={field.required}
+                  />
+                ) : (
+                  <input
+                    className={inputClass}
+                    name={field.name}
+                    type={field.type || "text"}
+                    defaultValue={initialValues?.[field.name] ?? ""}
+                    placeholder={field.placeholder || ""}
+                    required={field.required}
+                    inputMode={field.inputMode}
+                  />
+                )}
+              </>
+            )}
           </label>
         ))}
       </div>
@@ -88,7 +117,7 @@ function RecordForm({ fields, image, initialValues, submitLabel, busy, onCancel,
   );
 }
 
-export default function CollectionManager({ title, description, items, fields, image, busy, onSave, onDelete }) {
+export default function CollectionManager({ title, description, items, fields, image, statusFields = [], busy, onSave, onDelete }) {
   const [editingId, setEditingId] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
 
@@ -136,6 +165,7 @@ export default function CollectionManager({ title, description, items, fields, i
                 <div className="min-w-0">
                   <p className="break-words text-lg font-bold text-white">{item[fields[0].name] || "Sin nombre"}</p>
                   <p className="mt-1 break-words text-sm text-white/50">{fields.slice(1, 3).map((field) => item[field.name]).filter(Boolean).join(" · ")}</p>
+                  {statusFields.length ? <div className="mt-2 flex flex-wrap gap-2">{statusFields.map((status) => <span key={status.name} className={`rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.15em] ${item[status.name] ? "border-neon/30 bg-neon/10 text-neon" : "border-white/10 text-white/35"}`}>{item[status.name] ? status.trueLabel : status.falseLabel}</span>)}</div> : null}
                 </div>
                 <div className="grid grid-cols-2 gap-2 sm:flex">
                   <button disabled={busy} onClick={() => setEditingId(item.id)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-white/15 px-3 text-sm text-white/80 disabled:opacity-50"><Pencil size={16} /> Editar</button>
