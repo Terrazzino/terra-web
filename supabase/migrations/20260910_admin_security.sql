@@ -1,8 +1,7 @@
 -- TERRA admin security migration (non-destructive for application data/files).
 -- Run once from Supabase Dashboard > SQL Editor, then add the admin user as
 -- documented in README.md. This resets policies on the six content tables and
--- storage.objects; review the preflight query in README if this Supabase project
--- also serves unrelated applications.
+-- recreates only the explicitly named TERRA policies on storage.objects.
 
 begin;
 
@@ -83,18 +82,12 @@ values
   ('merch', 'merch', true)
 on conflict (id) do update set public = excluded.public;
 
--- Reset object policies so an older permissive write policy cannot override RLS.
-do $$
-declare
-  policy_name text;
-begin
-  for policy_name in
-    select policyname from pg_policies
-    where schemaname = 'storage' and tablename = 'objects'
-  loop
-    execute format('drop policy if exists %I on storage.objects', policy_name);
-  end loop;
-end $$;
+-- Manage only policies owned by TERRA. Existing policies with other names are
+-- intentionally preserved; audit them first using the query in README.md.
+drop policy if exists "terra_assets_public_read" on storage.objects;
+drop policy if exists "terra_assets_admin_insert" on storage.objects;
+drop policy if exists "terra_assets_admin_update" on storage.objects;
+drop policy if exists "terra_assets_admin_delete" on storage.objects;
 
 create policy "terra_assets_public_read"
 on storage.objects for select to anon, authenticated

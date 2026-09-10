@@ -51,17 +51,27 @@ El repositorio no puede conocer las políticas actualmente activas en producció
 Antes de migrar, ejecutar y guardar el resultado de esta consulta en SQL Editor:
 
 ```sql
-select schemaname, tablename, policyname, roles, cmd, qual, with_check
+select
+  policyname as policy_name,
+  cmd as command,
+  roles,
+  qual as using_expression,
+  with_check as with_check_expression
 from pg_policies
-where (schemaname = 'public' and tablename in
-  ('historia','redes','discografia','recitales','el_club','merch','admin_users'))
-   or (schemaname = 'storage' and tablename = 'objects')
-order by schemaname, tablename, policyname;
+where schemaname = 'storage'
+  and tablename = 'objects'
+order by policyname;
 ```
 
-La migración reemplaza las políticas de esas tablas y todas las políticas de
-`storage.objects`. Si el mismo proyecto Supabase contiene buckets de otra aplicación,
-adaptar primero la sección Storage para conservar sus políticas.
+Revisar especialmente policies antiguas con `INSERT`, `UPDATE`, `DELETE` o `ALL`
+asignadas a `anon`, `public` o sin una condición administrativa. SQL no puede saber
+si una policy antigua con otro nombre pertenece exclusivamente a TERRA: si permite
+escritura pública sobre `discografia`, `flyers` o `merch`, eliminarla explícitamente
+por su nombre antes de aplicar la migración.
+
+La migración reemplaza las policies de las tablas de contenido, pero en
+`storage.objects` elimina y recrea únicamente las cuatro policies con prefijo
+`terra_assets_`. Las policies de otros buckets o aplicaciones permanecen intactas.
 
 ### 3. Aplicar SQL/RLS
 
