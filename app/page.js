@@ -5,14 +5,16 @@ import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
 import { Menu, X, Zap } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
+import NewsSection from "./NewsSection";
 
 const sectionLinks = [
   { id: "hero", label: "INICIO" },
-  { id: "historia", label: "HISTORIA" },
-  { id: "discografia", label: "DISCOGRAFÍA" },
+  { id: "proximos-shows", label: "PRÓXIMOS SHOWS" },
   { id: "novedades", label: "NOVEDADES" },
-  { id: "el-club", label: "EL CLUB" },
   { id: "merch", label: "MERCH" },
+  { id: "discografia", label: "DISCOGRAFÍA" },
+  { id: "el-club", label: "EL CLUB" },
+  { id: "historia", label: "HISTORIA" },
 ];
 
 // Mapeo de logos personalizados de la carpeta /public
@@ -37,8 +39,10 @@ export default function Home() {
   const [historia, setHistoria] = useState(null);
   const [discografia, setDiscografia] = useState([]);
   const [recitales, setRecitales] = useState([]);
+  const [novedades, setNovedades] = useState([]);
   const [elClub, setElClub] = useState(null);
   const [merch, setMerch] = useState([]);
+  const [historyExpanded, setHistoryExpanded] = useState(false);
 
   const instagramUrl = redes.find((item) => (item.name || "").toLowerCase().includes("instagram"))?.url || "https://www.instagram.com/terra_okey/";
 
@@ -60,14 +64,19 @@ export default function Home() {
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
-      const [redesRes, historiaRes, discografiaRes, recitalesRes, elClubRes, merchRes] = await Promise.all([
+      const responses = await Promise.all([
         supabase.from("redes").select("*").order("orden", { ascending: true }),
         supabase.from("historia").select("*").limit(1).maybeSingle(),
         supabase.from("discografia").select("*").order("year", { ascending: false }),
         supabase.from("recitales").select("*").order("fecha", { ascending: true }),
+        supabase.from("novedades").select("*").eq("visible", true).order("destacada", { ascending: false }).order("orden", { ascending: true }).order("fecha", { ascending: false, nullsFirst: false }),
         supabase.from("el_club").select("*").limit(1).maybeSingle(),
         supabase.from("merch").select("*").order("created_at", { ascending: false }),
       ]);
+      const [redesRes, historiaRes, discografiaRes, recitalesRes, novedadesRes, elClubRes, merchRes] = responses;
+
+      const loadError = responses.find((response) => response.error)?.error;
+      if (loadError) console.error("No se pudo cargar parte del contenido público:", loadError.message);
 
       setRedes(redesRes.data || []);
       setHistoria(historiaRes.data || null);
@@ -81,6 +90,12 @@ export default function Home() {
         (recitalesRes.data || []).map((item) => ({
           ...item,
           flyer_url: item.flyer_url || getPublicUrl("flyers", item.flyer_path),
+        })),
+      );
+      setNovedades(
+        (novedadesRes.data || []).map((item) => ({
+          ...item,
+          imagen_url: item.imagen_url || getPublicUrl("novedades", item.imagen_path),
         })),
       );
       setElClub(elClubRes.data || null);
@@ -115,7 +130,7 @@ export default function Home() {
             TERRA
           </button>
 
-          <nav className="hidden items-center gap-6 lg:flex">
+          <nav className="hidden items-center gap-4 xl:flex xl:gap-6">
             {sectionLinks.map((link) => (
               <button key={link.id} onClick={() => handleScrollTo(link.id)} className="text-xs tracking-[0.3em] text-white/70 transition hover:text-neon">
                 {link.label}
@@ -123,7 +138,7 @@ export default function Home() {
             ))}
           </nav>
 
-          <button className="lg:hidden text-white/80" onClick={() => setMobileOpen(!mobileOpen)} aria-label="Abrir menú">
+          <button className="text-white/80 xl:hidden" onClick={() => setMobileOpen(!mobileOpen)} aria-label="Abrir menú">
             {mobileOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
         </div>
@@ -136,7 +151,7 @@ export default function Home() {
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="fixed inset-x-0 top-16 z-40 border-b border-white/10 bg-black/95 px-5 py-5 lg:hidden"
+            className="fixed inset-x-0 top-16 z-40 max-h-[calc(100vh-4rem)] overflow-y-auto border-b border-white/10 bg-black/95 px-5 py-5 xl:hidden"
           >
             <div className="flex flex-col gap-4">
               {sectionLinks.map((link) => (
@@ -168,9 +183,9 @@ export default function Home() {
         ) : null}
       </AnimatePresence>
 
-      <main className="relative overflow-hidden">
+      <main className="relative flex flex-col overflow-hidden">
         {/* HERO SECTION */}
-        <section id="hero" className="relative grid min-h-screen place-items-center px-5 py-28 sm:px-8 lg:px-14">
+        <section id="hero" className="relative order-1 grid min-h-screen place-items-center px-5 py-28 sm:px-8 lg:px-14">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(255,0,51,0.15),_transparent_30%),linear-gradient(180deg,_rgba(255,255,255,0.02),transparent)]" />
           
           <div className="relative z-10 flex max-w-6xl flex-col items-center gap-10 text-center">
@@ -236,8 +251,10 @@ export default function Home() {
           </div>
         </section>
 
+        <NewsSection novedades={novedades} />
+
         {/* HISTORIA */}
-        <section id="historia" className="relative border-t border-white/10 bg-[#090909] px-5 py-24 sm:px-8 lg:px-14">
+        <section id="historia" className="relative order-7 border-t border-white/10 bg-[#090909] px-5 py-24 sm:px-8 lg:px-14">
           
           {/* CONTENEDOR DEL LOGO DE FONDO: COMPLETO Y MÁXIMO TAMAÑO SIN RECORTAR */}
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-4 opacity-15">
@@ -262,7 +279,14 @@ export default function Home() {
             </div>
 
             {/* RELATO COMPLETO DE LA HISTORIA */}
-            <div className="space-y-6 text-base leading-8 text-white/80 sm:text-lg sm:leading-9">
+            <div className="relative">
+            <motion.div
+              id="historia-completa"
+              initial={false}
+              animate={{ height: historyExpanded ? "auto" : 260 }}
+              transition={{ duration: 0.45, ease: "easeInOut" }}
+              className="space-y-6 overflow-hidden text-base leading-8 text-white/80 sm:text-lg sm:leading-9"
+            >
               <p>
                 Terra nació en plena pandemia, después del final de otro proyecto de rock. En ese momento la búsqueda era distinta: bajar un cambio, explorar sonidos más cercanos al folk y empezar de nuevo. Pero con el tiempo quedó claro que había algo imposible de dejar atrás: el rock and roll.
               </p>
@@ -295,13 +319,25 @@ export default function Home() {
                   Y esto recién empieza.
                 </p>
               </div>
+            </motion.div>
+            {!historyExpanded ? <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-[#090909] to-transparent" /> : null}
             </div>
+
+            <button
+              type="button"
+              aria-expanded={historyExpanded}
+              aria-controls="historia-completa"
+              onClick={() => setHistoryExpanded((value) => !value)}
+              className="inline-flex items-center justify-center rounded-full border border-neon/30 bg-neon/10 px-7 py-3 text-xs font-bold uppercase tracking-[0.3em] text-neon transition hover:bg-neon/20"
+            >
+              {historyExpanded ? "Mostrar menos" : "Leer historia completa"}
+            </button>
 
           </div>
         </section>
 
         {/* DISCOGRAFÍA */}
-        <section id="discografia" className="px-5 py-24 sm:px-8 lg:px-14">
+        <section id="discografia" className="order-5 px-5 py-24 sm:px-8 lg:px-14">
           <div className="mx-auto max-w-6xl space-y-10">
             
             {/* CABECERA */}
@@ -417,12 +453,12 @@ export default function Home() {
           </div>
         </section>
 
-        {/* NOVEDADES */}
-        <section id="novedades" className="border-t border-white/10 bg-[#060606] px-5 py-24 sm:px-8 lg:px-14">
+        {/* PRÓXIMOS SHOWS */}
+        <section id="proximos-shows" className="order-2 border-t border-white/10 bg-[#060606] px-5 py-24 sm:px-8 lg:px-14">
           <div className="mx-auto max-w-6xl space-y-10">
             <div className="space-y-4 text-center">
-              <p className="text-sm uppercase tracking-[0.5em] text-white/50">Próximos shows</p>
-              <h2 className="text-4xl font-black uppercase tracking-[0.2em] text-white sm:text-5xl">Novedades</h2>
+              <p className="text-sm uppercase tracking-[0.5em] text-white/50">TERRA en vivo</p>
+              <h2 className="text-4xl font-black uppercase tracking-[0.2em] text-white sm:text-5xl">Próximos Shows</h2>
               <p className="mx-auto max-w-2xl text-sm leading-7 text-white/70">
                 Estos son los próximos recitales de la manada. Para entradas, escribinos directamente por Instagram.
               </p>
@@ -469,7 +505,7 @@ export default function Home() {
         </section>
 
         {/* EL CLUB DE LAS OVEJAS NEGRAS */}
-        <section id="el-club" className="px-5 py-24 sm:px-8 lg:px-14">
+        <section id="el-club" className="order-6 px-5 py-24 sm:px-8 lg:px-14">
           <div className="mx-auto max-w-4xl">
             <div className="flex flex-col items-center justify-center rounded-[2.5rem] border border-white/10 bg-[#0a0a0a] p-8 text-center shadow-glow sm:p-12">
               
@@ -509,7 +545,7 @@ export default function Home() {
         </section>
 
         {/* MERCH */}
-        <section id="merch" className="border-t border-white/10 bg-[#080808] px-5 py-24 sm:px-8 lg:px-14">
+        <section id="merch" className="order-4 border-t border-white/10 bg-[#080808] px-5 py-24 sm:px-8 lg:px-14">
           <div className="mx-auto max-w-6xl space-y-10">
             <div className="space-y-4 text-center">
               <p className="text-sm uppercase tracking-[0.5em] text-white/50">Merchandising</p>
@@ -543,20 +579,24 @@ export default function Home() {
               ))}
             </div>
 
-            <div className="rounded-[2rem] border border-neon/20 bg-black/80 p-8 text-center">
-              <p className="text-sm uppercase tracking-[0.45em] text-neon/70">Atención</p>
-              <p className="mt-4 text-base leading-7 text-white/70">
-                PARA ADQUIRIR MERCHANDISING OFICIAL, ENVIANOS UN MENSAJE PRIVADO A NUESTRO INSTAGRAM.
-              </p>
-              <a
-                href={instagramUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-6 inline-flex items-center justify-center rounded-full border border-neon/30 bg-neon/10 px-8 py-4 text-sm uppercase tracking-[0.35em] text-neon transition hover:bg-neon/20"
-              >
-                ENVIAR MENSAJE A INSTAGRAM
-              </a>
-            </div>
+          </div>
+        </section>
+
+        {/* ATENCIÓN / CIERRE */}
+        <section className="order-8 border-t border-white/10 bg-[#080808] px-5 py-16 sm:px-8 lg:px-14">
+          <div className="mx-auto max-w-6xl rounded-[2rem] border border-neon/20 bg-black/80 p-8 text-center">
+            <p className="text-sm uppercase tracking-[0.45em] text-neon/70">Atención</p>
+            <p className="mt-4 text-base leading-7 text-white/70">
+              PARA ADQUIRIR MERCHANDISING OFICIAL, ENVIANOS UN MENSAJE PRIVADO A NUESTRO INSTAGRAM.
+            </p>
+            <a
+              href={instagramUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-6 inline-flex items-center justify-center rounded-full border border-neon/30 bg-neon/10 px-8 py-4 text-sm uppercase tracking-[0.35em] text-neon transition hover:bg-neon/20"
+            >
+              ENVIAR MENSAJE A INSTAGRAM
+            </a>
           </div>
         </section>
       </main>

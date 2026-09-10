@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
 import { Zap, LogIn, LogOut, Upload, Trash2, Loader2 } from "lucide-react";
+import NewsManager from "./NewsManager";
 
 const AUTHORIZED_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "admin@terra.com";
 
@@ -33,6 +34,7 @@ export default function AdminPage() {
   const [historia, setHistoria] = useState(null);
   const [discografia, setDiscografia] = useState([]);
   const [recitales, setRecitales] = useState([]);
+  const [novedades, setNovedades] = useState([]);
   const [elClub, setElClub] = useState(null);
   const [merch, setMerch] = useState([]);
   
@@ -62,14 +64,19 @@ export default function AdminPage() {
   // Carga unificada de todos los contenidos
   const fetchContent = useCallback(async () => {
     try {
-      const [redesRes, historiaRes, discografiaRes, recitalesRes, elClubRes, merchRes] = await Promise.all([
+      const responses = await Promise.all([
         supabase.from("redes").select("*"),
         supabase.from("historia").select("*").limit(1).maybeSingle(),
         supabase.from("discografia").select("*").order("created_at", { ascending: false }),
         supabase.from("recitales").select("*").order("created_at", { ascending: false }),
+        supabase.from("novedades").select("*").order("destacada", { ascending: false }).order("orden", { ascending: true }).order("fecha", { ascending: false, nullsFirst: false }),
         supabase.from("el_club").select("*").limit(1).maybeSingle(),
         supabase.from("merch").select("*").order("created_at", { ascending: false }),
       ]);
+      const [redesRes, historiaRes, discografiaRes, recitalesRes, novedadesRes, elClubRes, merchRes] = responses;
+
+      const loadError = responses.find((response) => response.error)?.error;
+      if (loadError) throw loadError;
 
       setRedes(redesRes.data || []);
       setHistoria(historiaRes.data || null);
@@ -83,6 +90,12 @@ export default function AdminPage() {
         (recitalesRes.data || []).map((item) => ({
           ...item,
           flyer_url: item.flyer_url || getPublicUrl("flyers", item.flyer_path),
+        }))
+      );
+      setNovedades(
+        (novedadesRes.data || []).map((item) => ({
+          ...item,
+          imagen_url: item.imagen_url || getPublicUrl("novedades", item.imagen_path),
         }))
       );
       setElClub(elClubRes.data || null);
@@ -328,7 +341,7 @@ const signIn = async () => {
             <p className="text-sm uppercase tracking-[0.4em] text-neon/80">Panel privado</p>
             <h1 className="mt-3 text-4xl font-black uppercase tracking-[0.2em] text-white">Administración TERRA</h1>
             <p className="mt-3 text-sm leading-7 text-white/70">
-              Bienvenido, {userEmail}. Aquí podés editar la historia, redes, merch, discografía, recitales y El Club.
+              Bienvenido, {userEmail}. Aquí podés editar la historia, redes, merch, discografía, recitales, novedades y El Club.
             </p>
           </div>
           <button
@@ -338,6 +351,13 @@ const signIn = async () => {
             <LogOut size={18} /> Cerrar sesión
           </button>
         </header>
+
+        <nav aria-label="Secciones del panel" className="flex flex-wrap gap-3">
+          <a href="#admin-novedades" className="rounded-full border border-neon/30 bg-neon/10 px-5 py-2.5 text-xs uppercase tracking-[0.28em] text-neon transition hover:bg-neon/20">Novedades</a>
+          <span className="rounded-full border border-white/10 px-5 py-2.5 text-xs uppercase tracking-[0.28em] text-white/45">Recitales</span>
+          <span className="rounded-full border border-white/10 px-5 py-2.5 text-xs uppercase tracking-[0.28em] text-white/45">Discografía</span>
+          <span className="rounded-full border border-white/10 px-5 py-2.5 text-xs uppercase tracking-[0.28em] text-white/45">Merch</span>
+        </nav>
 
         {errorMessage ? (
           <div className="rounded-[1.75rem] border border-red-500/20 bg-[#2a0b0b] p-6 text-sm text-red-200">
@@ -493,6 +513,8 @@ const signIn = async () => {
             </form>
           </div>
         </section>
+
+        <NewsManager novedades={novedades} onRefresh={fetchContent} />
 
         {/* SUBIR MERCH */}
         <section className="rounded-[2rem] border border-white/10 bg-[#0d0d0d] p-8 shadow-glow">
