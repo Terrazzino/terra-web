@@ -59,6 +59,13 @@ create table if not exists merch (
   created_at timestamptz default now()
 );
 
+-- Usuarios autorizados a administrar el contenido. Se completa únicamente
+-- desde SQL Editor/Dashboard usando el UUID de una cuenta de auth.users.
+create table if not exists admin_users (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+
 -- Indexes optional for performance
 create index if not exists idx_redes_orden on redes (orden);
 create index if not exists idx_discografia_year on discografia (year);
@@ -67,6 +74,11 @@ create index if not exists idx_recitales_fecha on recitales (fecha);
 -- Buckets configuration (run via Supabase dashboard or CLI if supported)
 -- Buckets: flyers, discografia, merch
 -- Access settings: public read access for assets, private write via Supabase Storage policies.
+
+-- IMPORTANTE: después de crear las tablas, ejecutar la migración no destructiva
+-- supabase/migrations/20260910_admin_security.sql para habilitar RLS y las
+-- políticas de tablas/Storage. No se debe usar este esquema para recrear tablas
+-- que ya contienen datos.
 
 -- Nota: Supabase SQL nativo no crea buckets; úsese dashboard o CLI:
 -- supabase storage bucket create flyers --public

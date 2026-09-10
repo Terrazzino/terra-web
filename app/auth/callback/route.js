@@ -1,45 +1,36 @@
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
-import { NextResponse } from 'next/server';
+import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+import { RECOVERY_COOKIE, UPDATE_PASSWORD_PATH } from "@/lib/auth/recovery";
 
 export async function GET(request) {
   const requestUrl = new URL(request.url);
-  const code = requestUrl.searchParams.get('code');
-  const next = requestUrl.searchParams.get('next') ?? '/admin';
+  const code = requestUrl.searchParams.get("code");
+  const requestedNext = requestUrl.searchParams.get("next") ?? "/admin";
+  const next = requestedNext.startsWith("/") && !requestedNext.startsWith("//")
+    ? requestedNext
+    : "/admin";
 
   if (code) {
-    const cookieStore = await cookies();
-    
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
-          setAll(cookiesToSet) {
-            try {
-              cookiesToSet.forEach(({ name, value, options }) =>
-                cookieStore.set(name, value, options)
-              );
-            } catch {
-              // El bloque try/catch previene errores si se llama desde Server Components
-            }
-          },
-        },
-      }
-    );
-
-    // Intercambia el código por la sesión de usuario y la guarda en las cookies
+    const supabase = await createClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
-    
     if (!error) {
-      // Redirige correctamente a la página del panel de administración
-      return NextResponse.redirect(`${requestUrl.origin}${next}`);
+      const response = NextResponse.redirect(`${requestUrl.origin}${next}`);
+      if (next === UPDATE_PASSWORD_PATH) {
+        response.cookies.set(RECOVERY_COOKIE, "pending", {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "lax",
+          maxAge: 15 * 60,
+          path: UPDATE_PASSWORD_PATH,
+        });
+      }
+      return response;
     }
   }
 
-  // Si hubo error o no hubo código, vuelve al inicio
-  return NextResponse.redirect(`${requestUrl.origin}`);
+  if (next === UPDATE_PASSWORD_PATH) {
+    return NextResponse.redirect(`${requestUrl.origin}${UPDATE_PASSWORD_PATH}?error=invalid`);
+  }
+
+  return NextResponse.redirect(`${requestUrl.origin}/admin?auth_error=callback`);
 }
