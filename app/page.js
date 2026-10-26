@@ -3,8 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
-import { Menu, X, Zap } from "lucide-react";
+import { MapPin, Menu, X, Zap } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
+import { classifyRecitales, formatRecitalDate, isValidGoogleMapsUrl } from "@/lib/recitales";
+import { useArgentinaToday } from "@/lib/useArgentinaToday";
 import NewsSection from "./NewsSection";
 
 const sectionLinks = [
@@ -43,6 +45,7 @@ export default function Home() {
   const [elClub, setElClub] = useState(null);
   const [merch, setMerch] = useState([]);
   const [historyExpanded, setHistoryExpanded] = useState(false);
+  const argentinaToday = useArgentinaToday();
 
   const instagramUrl = redes.find((item) => (item.nombre || item.name || "").toLowerCase().includes("instagram"))?.url || "https://www.instagram.com/terra_okey/";
 
@@ -58,6 +61,7 @@ export default function Home() {
     () => discografia.filter((item) => (item.tipo || "").toLowerCase() === "single"),
     [discografia],
   );
+  const recitalesVigentes = useMemo(() => classifyRecitales(recitales, argentinaToday).vigentes, [recitales, argentinaToday]);
 
   const [activeTab, setActiveTab] = useState("todos");
 
@@ -68,7 +72,7 @@ export default function Home() {
         supabase.from("redes").select("*").order("orden", { ascending: true }),
         supabase.from("historia").select("*").limit(1).maybeSingle(),
         supabase.from("discografia").select("*").order("year", { ascending: false }),
-        supabase.from("recitales").select("*").order("fecha", { ascending: true }),
+        supabase.from("recitales").select("*"),
         supabase.from("novedades").select("*").eq("visible", true).order("destacada", { ascending: false }).order("orden", { ascending: true }).order("fecha", { ascending: false, nullsFirst: false }),
         supabase.from("el_club").select("*").limit(1).maybeSingle(),
         supabase.from("merch").select("*").order("created_at", { ascending: false }),
@@ -470,16 +474,9 @@ export default function Home() {
                 Estos son los próximos recitales de la manada. Para entradas, escribinos directamente por Instagram.
               </p>
             </div>
+            {recitalesVigentes.length ? (
             <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
-              {(recitales.length ? recitales : [
-                {
-                  ciudad: "Próximamente",
-                  fecha: "---",
-                  hora: "---",
-                  direccion: "---",
-                  flyer_url: null,
-                },
-              ]).map((item) => (
+              {recitalesVigentes.map((item) => (
                 <div key={item.id || item.direccion} className="group overflow-hidden rounded-[2rem] border border-white/10 bg-[#0d0d0d] shadow-glow transition hover:-translate-y-1">
                   <div className="relative h-[320px] overflow-hidden bg-white/5">
                     {item.flyer_url ? (
@@ -491,10 +488,20 @@ export default function Home() {
                   </div>
                   <div className="space-y-3 p-6">
                     <p className="text-sm uppercase tracking-[0.35em] text-neon/80">{item.ciudad}</p>
-                    <h3 className="text-2xl font-bold uppercase tracking-[0.1em] text-white">{item.fecha}</h3>
+                    <h3 className="text-2xl font-bold uppercase tracking-[0.1em] text-white">{formatRecitalDate(item.fecha_evento)}</h3>
                     <div className="grid gap-2 text-sm text-white/60">
                       <p>Hora: {item.hora}</p>
                       <p>Dirección: {item.direccion}</p>
+                      {isValidGoogleMapsUrl(item.google_maps_url) ? (
+                        <a
+                          href={item.google_maps_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex w-fit items-center gap-2 text-neon transition hover:text-white"
+                        >
+                          <MapPin size={16} aria-hidden="true" /> Ver ubicación en Google Maps
+                        </a>
+                      ) : null}
                     </div>
                     <a
                       href={item.instagram_url || instagramUrl}
@@ -508,6 +515,12 @@ export default function Home() {
                 </div>
               ))}
             </div>
+            ) : (
+              <div className="rounded-[2rem] border border-dashed border-neon/25 bg-neon/5 px-6 py-12 text-center shadow-glow">
+                <p className="text-sm font-bold uppercase tracking-[0.3em] text-neon">La Manada vuelve pronto</p>
+                <p className="mx-auto mt-3 max-w-xl text-sm leading-7 text-white/65">Próximamente anunciaremos nuevas fechas. Seguinos en Instagram para enterarte primero.</p>
+              </div>
+            )}
           </div>
         </section>
 

@@ -117,7 +117,7 @@ function RecordForm({ fields, image, initialValues, submitLabel, busy, onCancel,
   );
 }
 
-export default function CollectionManager({ title, description, items, fields, image, statusFields = [], busy, onSave, onDelete }) {
+export default function CollectionManager({ title, description, items, groups, fields, image, statusFields = [], busy, onSave, onDelete }) {
   const [editingId, setEditingId] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
 
@@ -150,8 +150,15 @@ export default function CollectionManager({ title, description, items, fields, i
         </div>
       ) : null}
 
-      <div className="grid gap-4">
-        {items.length ? items.map((item) => (
+      {(groups || [{ id: "all", items }]).map((group) => (
+        <div key={group.id} className="grid gap-4">
+          {group.title ? (
+            <div className={`mt-3 flex flex-col gap-2 rounded-2xl border px-4 py-4 sm:flex-row sm:items-center sm:justify-between ${group.warning ? "border-amber-400/25 bg-amber-500/5" : "border-white/10 bg-white/[0.02]"}`}>
+              <div><h3 className={`font-black uppercase tracking-[0.16em] ${group.warning ? "text-amber-200" : "text-white"}`}>{group.title}</h3><p className="mt-1 text-xs leading-5 text-white/45">{group.description}</p></div>
+              <span className="shrink-0 rounded-full border border-white/10 px-3 py-1 text-xs font-bold text-white/65">{group.items.length} recital{group.items.length === 1 ? "" : "es"}</span>
+            </div>
+          ) : null}
+        {group.items.length ? group.items.map((item) => (
           <article key={item.id} className="min-w-0 rounded-3xl border border-white/10 bg-[#0b0b0b] p-4 sm:p-6">
             {editingId === item.id ? (
               <RecordForm fields={fields} image={image} initialValues={item} submitLabel="Guardar cambios" busy={busy} onCancel={() => setEditingId(null)} onSubmit={(values, file) => saveEdit(item, values, file)} />
@@ -174,8 +181,9 @@ export default function CollectionManager({ title, description, items, fields, i
               </div>
             )}
           </article>
-        )) : <p className="rounded-3xl border border-dashed border-white/10 p-8 text-center text-sm text-white/40">Todavía no hay registros.</p>}
-      </div>
+        )) : <p className="rounded-3xl border border-dashed border-white/10 p-8 text-center text-sm text-white/40">{group.title ? "No hay recitales en este grupo." : "Todavía no hay registros."}</p>}
+        </div>
+      ))}
     </section>
   );
 }

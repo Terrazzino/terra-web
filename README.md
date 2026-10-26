@@ -111,6 +111,35 @@ RLS, mantiene lectura pública para el contenido de la landing y restringe INSER
 UPDATE y DELETE a administradores autenticados. También deja lectura pública de los
 buckets `discografia`, `flyers` y `merch`, con escritura/borrado sólo para admins.
 
+Para habilitar la clasificación automática de recitales, ejecutar primero:
+
+`supabase/migrations/20261026_recital_event_date.sql`
+
+Esta migración es aditiva: incorpora `recitales.fecha_evento` de tipo `date`, crea
+su índice y conserva intactos `fecha`, flyers, enlaces y demás datos. Antes de seguir,
+todos los recitales existentes deben tener su fecha real completa en `fecha_evento`.
+No se debe deducir el año a partir del día actual.
+
+Para agregar ubicaciones y desplegar el retiro de la fecha textual sin interrumpir
+el panel, seguir este orden exacto:
+
+1. Ejecutar `supabase/migrations/20261027_recital_maps_compat.sql`. Agrega
+   `google_maps_url` y permite omitir `fecha`, pero todavía no borra la columna.
+2. Desplegar el código actualizado y verificar creación, edición, landing, flyers y
+   enlaces de Instagram y Maps.
+3. Confirmar que no quedan fechas incompletas:
+
+   ```sql
+   select count(*) as recitales_sin_fecha
+   from public.recitales
+   where fecha_evento is null;
+   ```
+
+4. Cuando el resultado sea cero y la versión anterior ya no esté atendiendo tráfico,
+   ejecutar `supabase/migrations/20261028_drop_recital_legacy_date.sql`. Esta última
+   migración vuelve `fecha_evento` obligatoria y elimina `fecha`; aborta sin cambios
+   si detecta alguna fecha incompleta.
+
 ### 4. Autorizar la cuenta administradora
 
 Después de crear o actualizar el usuario en Authentication > Users, ejecutar
