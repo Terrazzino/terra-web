@@ -1,11 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { BookOpen, CheckCircle2, Disc3, ExternalLink, Home, Loader2, LogIn, LogOut, Menu, Music2, Newspaper, Package, Save, Share2, ShieldAlert, Ticket, X, XCircle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import CollectionManager from "./CollectionManager";
+import { classifyRecitales, isValidGoogleMapsUrl } from "@/lib/recitales";
+import { useArgentinaToday } from "@/lib/useArgentinaToday";
 
 const supabase = createClient();
 const inputClass = "min-h-12 w-full rounded-2xl border border-white/10 bg-black px-4 py-3 text-base text-white outline-none transition placeholder:text-white/30 focus:border-neon sm:text-sm";
@@ -39,9 +41,10 @@ const collectionConfig = {
     description: "Administrá fechas, datos del show, enlace de Instagram y flyer.",
     fields: [
       { name: "ciudad", label: "Ciudad", required: true },
-      { name: "fecha", label: "Fecha", required: true },
+      { name: "fecha_evento", label: "Fecha", type: "date", required: true },
       { name: "hora", label: "Hora", required: true },
       { name: "direccion", label: "Dirección", required: true },
+      { name: "google_maps_url", label: "Ubicación de Google Maps (opcional)", type: "url", placeholder: "https://maps.app.goo.gl/...", emptyAsNull: true, wide: true },
       { name: "instagram_url", label: "Instagram URL", type: "url", placeholder: "https://...", wide: true },
     ],
     image: { bucket: "flyers", pathField: "flyer_path", urlField: "flyer_url", label: "Elegir flyer" },
@@ -87,6 +90,9 @@ function validateCollection(fields, values, file) {
   fields.forEach((field) => {
     if (field.required && !values[field.name]) throw new Error(`${field.label} es obligatorio.`);
     if (field.type === "url") assertOptionalUrl(values[field.name], field.label);
+    if (field.name === "google_maps_url" && values[field.name] && !isValidGoogleMapsUrl(values[field.name])) {
+      throw new Error("La ubicación debe ser un enlace válido de Google Maps (por ejemplo, google.com/maps o maps.app.goo.gl).");
+    }
   });
   if (file && !file.type.startsWith("image/")) throw new Error("El archivo seleccionado debe ser una imagen.");
   if (file && file.size > 15 * 1024 * 1024) throw new Error("La imagen supera el máximo permitido de 15 MB.");
@@ -225,6 +231,15 @@ export default function AdminPanel({ initialUser, authorized, authorizationError
   const [historiaText, setHistoriaText] = useState("");
   const [clubForm, setClubForm] = useState({ descripcion: "", playlist_url: "" });
   const [redesDraft, setRedesDraft] = useState({});
+  const argentinaToday = useArgentinaToday();
+  const recitalGroups = useMemo(() => {
+    const { vigentes, finalizados, sinFechaCompleta } = classifyRecitales(content.recitales, argentinaToday);
+    return [
+      { id: "vigentes", title: "Recitales vigentes", description: "Shows de hoy y fechas futuras, del más cercano al más lejano.", items: vigentes },
+      { id: "finalizados", title: "Recitales finalizados", description: "Shows anteriores, del más reciente al más antiguo.", items: finalizados },
+      ...(sinFechaCompleta.length ? [{ id: "sin-fecha", title: "Fecha pendiente de completar", description: "Registros heredados sin año. Asigná una fecha completa para clasificarlos.", items: sinFechaCompleta, warning: true }] : []),
+    ];
+  }, [content.recitales, argentinaToday]);
 
   const loadContent = useCallback(async () => {
     setLoading(true);
@@ -405,7 +420,7 @@ export default function AdminPanel({ initialUser, authorized, authorizationError
 
           {!loading && active === "redes" ? <section><h2 className="text-2xl font-black uppercase tracking-[0.12em]">Redes sociales</h2><p className="mt-2 text-sm text-white/55">Editá el nombre, enlace y orden de las redes existentes.</p><div className="mt-6 grid gap-4">{content.redes.map((item) => <div key={item.id} className="grid gap-3 rounded-3xl border border-white/10 bg-[#0b0b0b] p-4 sm:grid-cols-[1fr_2fr_7rem]"><input aria-label="Nombre" className={inputClass} value={redesDraft[item.id]?.nombre || ""} onChange={(event) => setRedesDraft((draft) => ({ ...draft, [item.id]: { ...draft[item.id], nombre: event.target.value } }))} /><input aria-label="URL" type="url" className={inputClass} value={redesDraft[item.id]?.url || ""} onChange={(event) => setRedesDraft((draft) => ({ ...draft, [item.id]: { ...draft[item.id], url: event.target.value } }))} /><input aria-label="Orden" type="number" className={inputClass} value={redesDraft[item.id]?.orden ?? 0} onChange={(event) => setRedesDraft((draft) => ({ ...draft, [item.id]: { ...draft[item.id], orden: Number(event.target.value) } }))} /></div>)}</div><button disabled={busy || !content.redes.length} onClick={saveRedes} className="mt-4 inline-flex min-h-12 items-center gap-2 rounded-2xl bg-neon px-5 font-bold text-black disabled:opacity-50">{busy ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />} Guardar redes</button></section> : null}
 
-          {!loading && ["discografia", "recitales", "novedades", "merch"].includes(active) ? <CollectionManager {...collectionConfig[active]} items={content[active]} busy={busy} onSave={(item, values, file) => saveCollection(active, item, values, file)} onDelete={(item) => deleteCollection(active, item)} /> : null}
+          {!loading && ["discografia", "recitales", "novedades", "merch"].includes(active) ? <CollectionManager {...collectionConfig[active]} items={content[active]} groups={active === "recitales" ? recitalGroups : undefined} busy={busy} onSave={(item, values, file) => saveCollection(active, item, values, file)} onDelete={(item) => deleteCollection(active, item)} /> : null}
 
           {!loading && active === "club" ? <section><h2 className="text-2xl font-black uppercase tracking-[0.12em]">El Club</h2><p className="mt-2 text-sm text-white/55">Editá la descripción y el enlace a la playlist oficial.</p><div className="mt-6 grid gap-4"><label className="grid gap-2"><span className="text-xs font-bold uppercase tracking-[0.2em] text-white/55">Descripción</span><textarea rows={9} className={inputClass} value={clubForm.descripcion} onChange={(event) => setClubForm((form) => ({ ...form, descripcion: event.target.value }))} /></label><label className="grid gap-2"><span className="text-xs font-bold uppercase tracking-[0.2em] text-white/55">Playlist URL</span><input type="url" className={inputClass} value={clubForm.playlist_url} onChange={(event) => setClubForm((form) => ({ ...form, playlist_url: event.target.value }))} /></label></div><button disabled={busy} onClick={() => saveSingleton("el_club", content.elClub, { descripcion: clubForm.descripcion.trim(), playlist_url: clubForm.playlist_url.trim() }, "El Club")} className="mt-4 inline-flex min-h-12 items-center gap-2 rounded-2xl bg-neon px-5 font-bold text-black disabled:opacity-50">{busy ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />} Guardar El Club</button></section> : null}
         </div>
