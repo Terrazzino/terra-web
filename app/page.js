@@ -5,7 +5,7 @@ import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
 import { MapPin, Menu, X, Zap } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
-import { classifyRecitales, formatRecitalDate, isValidGoogleMapsUrl } from "@/lib/recitales";
+import { classifyRecitales, formatRecitalDate, getRecitalTicketLink, isValidGoogleMapsUrl } from "@/lib/recitales";
 import { useArgentinaToday } from "@/lib/useArgentinaToday";
 import NewsSection from "./NewsSection";
 
@@ -471,12 +471,14 @@ export default function Home() {
               <p className="text-sm uppercase tracking-[0.5em] text-white/50">TERRA en vivo</p>
               <h2 className="text-4xl font-black uppercase tracking-[0.2em] text-white sm:text-5xl">Próximos Shows</h2>
               <p className="mx-auto max-w-2xl text-sm leading-7 text-white/70">
-                Estos son los próximos recitales de la manada. Para entradas, escribinos directamente por Instagram.
+                Estos son los próximos recitales de la manada. Consultá o comprá tus entradas desde cada show.
               </p>
             </div>
             {recitalesVigentes.length ? (
             <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
-              {recitalesVigentes.map((item) => (
+              {recitalesVigentes.map((item) => {
+                const ticketLink = getRecitalTicketLink(item, instagramUrl);
+                return (
                 <div key={item.id || item.direccion} className="group overflow-hidden rounded-[2rem] border border-white/10 bg-[#0d0d0d] shadow-glow transition hover:-translate-y-1">
                   <div className="relative h-[320px] overflow-hidden bg-white/5">
                     {item.flyer_url ? (
@@ -504,16 +506,17 @@ export default function Home() {
                       ) : null}
                     </div>
                     <a
-                      href={item.instagram_url || instagramUrl}
+                      href={ticketLink.href}
                       target="_blank"
-                      rel="noreferrer"
+                      rel="noopener noreferrer"
                       className="inline-flex items-center justify-center rounded-full border border-neon/30 bg-neon/10 px-4 py-3 text-center text-xs uppercase tracking-[0.35em] text-neon transition hover:bg-neon/20"
                     >
-                      MANDAR MP A INSTAGRAM PARA ENTRADAS
+                      {ticketLink.label}
                     </a>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
             ) : (
               <div className="rounded-[2rem] border border-dashed border-neon/25 bg-neon/5 px-6 py-12 text-center shadow-glow">

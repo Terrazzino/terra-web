@@ -19,6 +19,9 @@ function RecordForm({ fields, image, initialValues, submitLabel, busy, onCancel,
   const id = useId();
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(initialValues?.[image?.urlField] || "");
+  const [exclusiveValues, setExclusiveValues] = useState(() => Object.fromEntries(
+    fields.filter((field) => field.mutuallyExclusiveWith).map((field) => [field.name, initialValues?.[field.name] ?? ""]),
+  ));
 
   useEffect(() => {
     if (!file) {
@@ -68,7 +71,13 @@ function RecordForm({ fields, image, initialValues, submitLabel, busy, onCancel,
                     className={inputClass}
                     name={field.name}
                     type={field.type || "text"}
-                    defaultValue={initialValues?.[field.name] ?? ""}
+                    {...(field.mutuallyExclusiveWith
+                      ? {
+                          value: exclusiveValues[field.name] || "",
+                          onChange: (event) => setExclusiveValues((values) => ({ ...values, [field.name]: event.target.value })),
+                          disabled: Boolean(exclusiveValues[field.mutuallyExclusiveWith]) && !exclusiveValues[field.name],
+                        }
+                      : { defaultValue: initialValues?.[field.name] ?? "" })}
                     placeholder={field.placeholder || ""}
                     required={field.required}
                     inputMode={field.inputMode}
