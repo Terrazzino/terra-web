@@ -38,9 +38,14 @@ create table if not exists recitales (
   direccion text not null,
   google_maps_url text,
   instagram_url text,
+  ticket_url text,
   flyer_path text,
   flyer_url text,
-  created_at timestamptz default now()
+  created_at timestamptz default now(),
+  constraint recitales_single_ticket_link_check check (
+    nullif(btrim(instagram_url), '') is null
+    or nullif(btrim(ticket_url), '') is null
+  )
 );
 
 -- 5. Tabla de El Club

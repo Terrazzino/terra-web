@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { BookOpen, CheckCircle2, Disc3, ExternalLink, Home, Loader2, LogIn, LogOut, Menu, Music2, Newspaper, Package, Save, Share2, ShieldAlert, Ticket, X, XCircle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import CollectionManager from "./CollectionManager";
-import { classifyRecitales, isValidGoogleMapsUrl } from "@/lib/recitales";
+import { classifyRecitales, isValidGoogleMapsUrl, validateRecitalLinks } from "@/lib/recitales";
 import { useArgentinaToday } from "@/lib/useArgentinaToday";
 
 const supabase = createClient();
@@ -38,14 +38,15 @@ const collectionConfig = {
   },
   recitales: {
     title: "Recitales",
-    description: "Administrá fechas, datos del show, enlace de Instagram y flyer.",
+    description: "Administrá fechas, datos del show, entradas y flyer.",
     fields: [
       { name: "ciudad", label: "Ciudad", required: true },
       { name: "fecha_evento", label: "Fecha", type: "date", required: true },
       { name: "hora", label: "Hora", required: true },
       { name: "direccion", label: "Dirección", required: true },
       { name: "google_maps_url", label: "Ubicación de Google Maps (opcional)", type: "url", placeholder: "https://maps.app.goo.gl/...", emptyAsNull: true, wide: true },
-      { name: "instagram_url", label: "Instagram URL", type: "url", placeholder: "https://...", wide: true },
+      { name: "instagram_url", label: "Instagram URL", type: "url", placeholder: "https://www.instagram.com/...", emptyAsNull: true, wide: true, mutuallyExclusiveWith: "ticket_url" },
+      { name: "ticket_url", label: "Enlace de compra de entradas (opcional)", type: "url", placeholder: "https://...", emptyAsNull: true, wide: true, mutuallyExclusiveWith: "instagram_url" },
     ],
     image: { bucket: "flyers", pathField: "flyer_path", urlField: "flyer_url", label: "Elegir flyer" },
   },
@@ -94,6 +95,7 @@ function validateCollection(fields, values, file) {
       throw new Error("La ubicación debe ser un enlace válido de Google Maps (por ejemplo, google.com/maps o maps.app.goo.gl).");
     }
   });
+  validateRecitalLinks(values);
   if (file && !file.type.startsWith("image/")) throw new Error("El archivo seleccionado debe ser una imagen.");
   if (file && file.size > 15 * 1024 * 1024) throw new Error("La imagen supera el máximo permitido de 15 MB.");
 }
